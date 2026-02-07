@@ -3,97 +3,104 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Unity iframe wrapper</title>
+  <title>Unity Game Embed</title>
   <style>
-    html, body { margin:0; padding:0; height:100%; overflow:hidden; }
-    iframe { border:0; width:100%; height:100%; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+    iframe {
+      border: 0;
+      width: 100%;
+      height: 100%;
+    }
   </style>
 </head>
 <body>
-  <!-- Unity iframe wrapper -->
-  <iframe srcdoc='
-    <!DOCTYPE html>
-    <html lang="en-us">
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-      <base href="https://cdn.jsdelivr.net/gh/faralong/test@main/hype/">
-      <script src="crazygames-sdk-v3-e.js"></script>
-      <script src="jszip.js"></script>
-      <style>
-        body { margin:0; padding:0; overflow:hidden; }
-        canvas { display:block; }
-        .noselect { user-select:none; }
-      </style>
-    </head>
-    <body class="noselect">
-      <canvas id="unity-canvas" style="position: fixed; top:0; left:0; width:100%; height:100%; outline:none; cursor:none;"></canvas>
-      <div id="local-overlay" style="position: fixed; display: none; inset: 0; font-family: Arial, Helvetica, sans-serif; color: white; align-items: center; justify-content: center; background-color: rgba(0,0,0,0.75); z-index:10000;"></div>
 
-      <script>
-        // ----- ZIP / Blob loader -----
-        async function fetchAndCombineZip(binUrls) {
-          const responses = await Promise.all(binUrls.map(url => fetch(url)));
-          const buffers = await Promise.all(responses.map(res => res.arrayBuffer()));
-          let totalLength = buffers.reduce((acc, buf) => acc + buf.byteLength, 0);
-          let combined = new Uint8Array(totalLength);
-          let offset = 0;
-          for (let buf of buffers) { combined.set(new Uint8Array(buf), offset); offset += buf.byteLength; }
-          return combined;
-        }
+  <!-- Unity game iframe -->
+  <iframe
+    id="unity-game-iframe"
+    srcdoc='
+      <!DOCTYPE html>
+      <html lang="en-us">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <base href="https://cdn.jsdelivr.net/gh/faralong/test@main/hype/">
+        <script src="crazygames-sdk-v3-e.js"></script>
+        <script src="jszip.js"></script>
+        <style>
+          body { margin:0; padding:0; }
+          .noselect { user-select: none; }
+        </style>
+      </head>
+      <body class="noselect">
 
-        async function unzipWebpFromExternalBins(binUrls) {
-          const blobUrls = {};
-          const bytes = await fetchAndCombineZip(binUrls);
-          const zip = await JSZip.loadAsync(bytes);
-          for (const [filename, file] of Object.entries(zip.files)) {
-            if (!file.dir) {
-              let mime = "";
-              if (filename.endsWith(".js")||filename.endsWith(".mjs")) mime="text/javascript";
-              else if (filename.endsWith(".css")) mime="text/css";
-              else if (filename.endsWith(".html")) mime="text/html";
-              else if (filename.endsWith(".wasm.br")) mime="application/wasm";
-              else if (filename.endsWith(".js.br")) mime="application/javascript";
-              else if (filename.endsWith(".jpg")||filename.endsWith(".jpeg")) mime="image/jpeg";
-              const rawBlob = await file.async("blob");
-              const blob = mime ? new Blob([rawBlob], {type:mime}) : rawBlob;
-              blobUrls[filename] = URL.createObjectURL(blob);
-            }
+        <canvas id="unity-canvas" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; outline: none; cursor: none;"></canvas>
+        <div id="local-overlay" style="position: fixed; display: none; inset: 0; font-family: Arial, Helvetica, sans-serif; color: white; align-items: center; justify-content: center; background-color: rgba(0,0,0,0.75); z-index:10000;"></div>
+
+        <script>
+        (async function(){
+          const binParts = ["parts_1.bin","parts_2.bin","parts_3.bin","parts_4.bin"];
+          let blobUrlss = "";
+          
+          async function fetchAndCombineZip(binUrls) {
+            const responses = await Promise.all(binUrls.map(url => fetch(url)));
+            const buffers = await Promise.all(responses.map(res => res.arrayBuffer()));
+            let totalLength = buffers.reduce((acc, buf) => acc + buf.byteLength, 0);
+            let combined = new Uint8Array(totalLength);
+            let offset = 0;
+            for (let buf of buffers) { combined.set(new Uint8Array(buf), offset); offset += buf.byteLength; }
+            return combined;
           }
-          return blobUrls;
-        }
 
-        let blobUrlss = "";
-        const binParts = ["parts_1.bin","parts_2.bin","parts_3.bin","parts_4.bin"];
+          async function unzipWebpFromExternalBins(binUrls) {
+            const blobUrls = {};
+            const bytes = await fetchAndCombineZip(binUrls);
+            const zip = await JSZip.loadAsync(bytes);
+            for (const [filename, file] of Object.entries(zip.files)) {
+              if (!file.dir) {
+                let mime = "";
+                if (filename.endsWith(".js")||filename.endsWith(".mjs")) mime="text/javascript";
+                else if (filename.endsWith(".css")) mime="text/css";
+                else if (filename.endsWith(".html")) mime="text/html";
+                else if (filename.endsWith(".wasm.br")) mime="application/wasm";
+                else if (filename.endsWith(".js.br")) mime="application/javascript";
+                else if (filename.endsWith(".jpg")||filename.endsWith(".jpeg")) mime="image/jpeg";
+                const rawBlob = await file.async("blob");
+                const blob = mime ? new Blob([rawBlob], { type: mime }) : rawBlob;
+                blobUrls[filename] = URL.createObjectURL(blob);
+              }
+            }
+            return blobUrls;
+          }
 
-        unzipWebpFromExternalBins(binParts).then(blobUrls => {
-          blobUrlss = blobUrls;
+          blobUrlss = await unzipWebpFromExternalBins(binParts);
 
           function rewriteURL(original) {
-            let trimmed = original.split("/").pop();
-            if (trimmed.includes("?")) trimmed = trimmed.split("?")[0];
+            const trimmed = original.split("/").pop().split("?")[0];
             return blobUrlss[trimmed] || original;
           }
 
-          // Override src/href for elements
-          const descriptors = [
-            [Image.prototype, "src"],
-            [HTMLScriptElement.prototype, "src"],
-            [HTMLLinkElement.prototype, "href"],
-            [HTMLMediaElement.prototype, "src"]
-          ];
-          descriptors.forEach(([proto, prop]) => {
+          // Override src/href properties
+          [[Image.prototype,'src'],[HTMLScriptElement.prototype,'src'],[HTMLLinkElement.prototype,'href'],[HTMLMediaElement.prototype,'src']]
+          .forEach(([proto,prop])=>{
             const desc = Object.getOwnPropertyDescriptor(proto, prop);
             Object.defineProperty(proto, prop, {
               set(value){ desc.set.call(this, rewriteURL(value)); },
               get: desc.get,
-              configurable:true, enumerable:true
+              configurable: true,
+              enumerable: true
             });
           });
 
           // Override fetch
           const originalFetch = window.fetch;
-          window.fetch = function(resource, init) {
+          window.fetch = function(resource, init){
             if (typeof resource==="string") resource = rewriteURL(resource);
             else if (resource instanceof Request) resource = new Request(rewriteURL(resource.url), resource);
             return originalFetch.call(this, resource, init);
@@ -101,7 +108,7 @@
 
           // Override XHR
           const originalOpen = XMLHttpRequest.prototype.open;
-          XMLHttpRequest.prototype.open = function(method,url,...rest) {
+          XMLHttpRequest.prototype.open = function(method,url,...rest){
             return originalOpen.call(this, method, rewriteURL(url), ...rest);
           };
 
@@ -128,42 +135,42 @@
             productVersion: "6.40"
           };
 
+          var gameInstance;
           const script = document.createElement("script");
           script.src = loaderUrl;
           script.onload = () => {
-            createUnityInstance(canvas, config, (progress)=>{}).then((unityInstance)=>{
-              console.log("Unity inited");
-            }).catch((msg)=>alert(msg));
+            createUnityInstance(canvas, config, progress => {}).then(unityInstance=>{
+              console.log("Unity initialized");
+              gameInstance = unityInstance;
+            }).catch(err=>console.error(err));
           };
           document.body.appendChild(script);
 
-          // ----- Pointer lock -----
-          function enablePointerLock() { if(canvas.requestPointerLock) canvas.requestPointerLock(); }
-          canvas.addEventListener("click", ()=>{ try{ enablePointerLock(); console.log("Pointer lock requested"); } catch(e){ console.error(e); } });
-          document.addEventListener("pointerlockchange", ()=>{ console.log(document.pointerLockElement===canvas ? "Pointer locked" : "Pointer unlocked"); });
-          document.addEventListener("pointerlockerror", (e)=>{ console.error("Pointer lock error",e); });
+          // Pointer lock
+          canvas.addEventListener("click",()=>{ if(canvas.requestPointerLock) canvas.requestPointerLock(); });
+          document.addEventListener("pointerlockchange",()=>{ console.log(document.pointerLockElement===canvas?"Pointer locked":"Pointer unlocked"); });
 
-          // ----- Resize -----
-          function resizeCanvas() { canvas.width=window.innerWidth; canvas.height=window.innerHeight; canvas.style.width=window.innerWidth+"px"; canvas.style.height=window.innerHeight+"px"; }
-          window.addEventListener("load", resizeCanvas);
-          window.addEventListener("resize", resizeCanvas);
+          // Resize
+          function resizeCanvas(){
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            canvas.style.width = window.innerWidth+"px";
+            canvas.style.height = window.innerHeight+"px";
+          }
+          window.addEventListener("load",resizeCanvas);
+          window.addEventListener("resize",resizeCanvas);
 
-          // ----- Focus -----
-          function setFocus() { window.focus(); canvas.focus(); }
-          window.addEventListener("touchstart", setFocus);
-          window.addEventListener("pointerdown", setFocus);
-
-          // ----- Service Worker -----
-          window.addEventListener("load", function(){ if("serviceWorker" in navigator) navigator.serviceWorker.register("ServiceWorker.js"); });
-
-        });
-      </script>
-    </body>
-    </html>
-  ' 
-  sandbox="allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-presentation allow-scripts allow-same-origin allow-downloads allow-popups allow-popups-to-escape-sandbox"
-  allowfullscreen
-  allow="autoplay; fullscreen; microphone; gamepad; clipboard-read; clipboard-write; accelerometer; gyroscope;"
+        })();
+        </script>
+      </body>
+      </html>
+    '
+    title="Unity Game"
+    sandbox="allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-presentation allow-scripts allow-same-origin allow-downloads allow-popups allow-popups-to-escape-sandbox"
+    allow="autoplay; fullscreen; microphone; gamepad; clipboard-read; clipboard-write; accelerometer; gyroscope;"
+    allowfullscreen
+    loading="eager"
   ></iframe>
+
 </body>
 </html>
